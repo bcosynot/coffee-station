@@ -1,0 +1,90 @@
+@settings(defaultLengthUnit = mm)
+
+// Parameter for edge rounding (not yet applied to geometry)
+fillet_radius = 5mm
+
+baseDepth = 166mm
+baseLength = 270mm
+baseHeight = 2.2cm
+pillarHeight = 18cm
+
+fellowDiameter = 118mm
+fellowCircleCenter = [
+  baseLength - (fellowDiameter / 2 + 20),
+  baseDepth - (fellowDiameter / 2 + 20)
+]
+
+fellowHole = startSketchOn(XY)
+  |> startProfile(at = [
+       baseLength - (fellowDiameter / 2 + 80),
+       0
+     ])
+  |> yLine(length = fellowDiameter / 2 + 20)
+  |> tangentialArc(diameter = fellowDiameter, angle = -180deg, tag = $fellowArc)
+  |> yLine(length = -(fellowDiameter / 2 + 20))
+  |> close()
+  |> extrude(length = baseHeight)
+
+base = startSketchOn(XY)
+  |> startProfile(at = [0, 0])
+  |> line(end = [baseLength, 0], tag = $bEdge1)
+  |> line(end = [0, baseDepth], tag = $bEdge2)
+  |> line(end = [-baseLength, 0], tag = $bEdge3)
+  |> close(tag = $bEdge4)
+  |> extrude(length = baseHeight)
+  |> fillet(
+       radius = fillet_radius,
+       tags = [
+         getNextAdjacentEdge(bEdge1),
+         getNextAdjacentEdge(bEdge2),
+         getNextAdjacentEdge(bEdge3),
+         getNextAdjacentEdge(bEdge4)
+       ],
+     )
+
+pillarSide = 5
+pillar1 = startSketchOn(base, face = END)
+  |> rectangle(height = pillarSide, width = pillarSide, corner = [0, 0])
+  |> extrude(length = pillarHeight)
+
+pillar2 = startSketchOn(base, face = END)
+  |> rectangle(height = -pillarSide, width = pillarSide, corner = [0, baseDepth])
+  |> extrude(length = pillarHeight)
+
+pillar3 = startSketchOn(base, face = END)
+  |> rectangle(height = pillarSide, width = -pillarSide, corner = [baseLength, 0])
+  |> extrude(length = pillarHeight)
+pillar4 = startSketchOn(base, face = END)
+  |> rectangle(height = -pillarSide, width = -pillarSide, corner = [baseLength, baseDepth])
+  |> extrude(length = pillarHeight)
+
+subtract(base, tools = [fellowHole])
+
+ceilingHeight = 35mm
+aeropressDiameter = 64mm
+aeropressHolder = startSketchOn(offsetPlane(XY, offset = pillarHeight + baseHeight))
+  |> startProfile(at = [18, 0])
+  |> yLine(length = fellowDiameter / 2 + 40)
+  |> tangentialArc(diameter = aeropressDiameter, angle = -180deg)
+  |> yLine(length = -(fellowDiameter / 2 + 40))
+  |> close()
+  |> extrude(length = ceilingHeight)
+
+ceiling = startSketchOn(offsetPlane(XY, offset = pillarHeight + baseHeight))
+  |> rectangle(width = baseLength, height = baseDepth, corner = [0, 0])
+  |> extrude(length = ceilingHeight)
+
+// subtract(ceiling, tools = [aeropressHolder])
+
+drawerSpace = startSketchOn(XZ)
+  |> rectangle(
+       height = 25,
+       width = -175,
+       corner = [
+         baseLength - 5,
+         baseHeight * 10 + pillarHeight * 10 + 50
+       ],
+     )
+  |> extrude(length = -(baseDepth - 5))
+
+subtract(ceiling, tools = [aeropressHolder, drawerSpace])
